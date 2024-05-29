@@ -89,7 +89,6 @@ public class login extends AppCompatActivity {
                                             Toast.makeText(login.this, e.getMessage(), Toast.LENGTH_SHORT).show();
                                         }
                                     } else {
-                                        // Email is not verified, show a message to the user
                                         Toast.makeText(login.this, "Please verify your email address first.", Toast.LENGTH_SHORT).show();
                                     }
                                 }

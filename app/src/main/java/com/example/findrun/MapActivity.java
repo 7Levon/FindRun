@@ -62,7 +62,7 @@ import java.util.Map;
 
 public class MapActivity extends AppCompatActivity implements OnMapReadyCallback {
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 101;
-    private static final long INACTIVE_THRESHOLD = 5 * 60 * 1000; // 5 minutes threshold
+    private static final long INACTIVE_THRESHOLD = 5 * 60 * 1000;
     private static final String TAG = "MapActivity";
 
     private MapView mMapView;
@@ -88,7 +88,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
     private Handler statusHandler;
     private Runnable statusRunnable;
     private static final long STATUS_UPDATE_INTERVAL = 5000;
-    private boolean isDestroyed = false;  // Flag to track activity state
+    private boolean isDestroyed = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -99,7 +99,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         if (getSupportActionBar() != null) {
             getSupportActionBar().hide();
         }
-        mMapView = findViewById(R.id.user_list_map);  // Ensure this ID matches your XML layout
+        mMapView = findViewById(R.id.user_list_map);
 
         if (mMapView != null) {
             if (savedInstanceState != null) {
@@ -370,7 +370,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
     @Override
     protected void onResume() {
         super.onResume();
-        isDestroyed = false;  // Set flag to false when activity is resumed
+        isDestroyed = false;
         mMapView.onResume();
         statusHandler.post(statusRunnable);
         updateUserStatus();
@@ -409,7 +409,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        isDestroyed = true;  // Set flag to true when activity is destroyed
+        isDestroyed = true;
         statusHandler.removeCallbacks(statusRunnable);
         updateUserStatusInactive();
         Log.d(TAG, "Activity destroyed");
@@ -490,7 +490,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 Users user = snapshot.getValue(Users.class);
-                if (user != null && !isDestroyed) {  // Check if activity is not destroyed
+                if (user != null && !isDestroyed) {
                     Glide.with(MapActivity.this)
                             .asBitmap()
                             .load(user.getProfilepic())
@@ -524,7 +524,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
     }
 
     private Bitmap getMarkerBitmapFromView(Bitmap bitmap) {
-        // Create a circular bitmap
+
         Bitmap circularBitmap = getCircularBitmap(bitmap);
 
         View customMarkerView = getLayoutInflater().inflate(R.layout.custom_marker, null);

@@ -2,15 +2,14 @@ package com.example.findrun;
 
 public class Users {
     String profilepic, mail, userName, password, userId, lastMessage, status;
-    boolean hasUnreadMessages;
     private boolean online;
     public Users() {}
-    public Users(String userName, String status, String profilepic, String userId, boolean hasUnreadMessages) {
+    public Users(String userName, String status, String profilepic, String userId) {
         this.userName = userName;
         this.status = status;
         this.profilepic = profilepic;
         this.userId = userId;
-        this.hasUnreadMessages = hasUnreadMessages;
+
     }
     public Users(String userId, String userName, String mail, String password, String profilepic, String status) {
         this.userId = userId;
@@ -21,15 +20,7 @@ public class Users {
         this.status = status;
     }
 
-    public Users(String userId, String userName, String mail, String password, String profilepic, String status, boolean hasUnreadMessages) {
-        this.userId = userId;
-        this.userName = userName;
-        this.mail = mail;
-        this.password = password;
-        this.profilepic = profilepic;
-        this.status = status;
-        this.hasUnreadMessages = hasUnreadMessages;
-    }
+
     public boolean isOnline() {
         return online;
     }
@@ -37,13 +28,7 @@ public class Users {
     public void setOnline(boolean online) {
         this.online = online;
     }
-    public boolean getHasUnreadMessages() {
-        return hasUnreadMessages;
-    }
 
-    public void setHasUnreadMessages(boolean hasUnreadMessages) {
-        this.hasUnreadMessages = hasUnreadMessages;
-    }
 
     public String getProfilepic() {
         return profilepic;

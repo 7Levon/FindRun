@@ -14,7 +14,6 @@ public class NotificationHelper {
         this.context = context;
         notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
 
-        // Create Notification Channel if not exists (for Android O and above)
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(CHANNEL_ID, "Chat Notifications", NotificationManager.IMPORTANCE_HIGH);
             notificationManager.createNotificationChannel(channel);
@@ -23,7 +22,7 @@ public class NotificationHelper {
 
     public void showNotification(String title, String message) {
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
-                .setSmallIcon(R.drawable.message) // Ensure this icon is present in your drawable folder
+                .setSmallIcon(R.drawable.message)
                 .setContentTitle(title)
                 .setContentText(message)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)

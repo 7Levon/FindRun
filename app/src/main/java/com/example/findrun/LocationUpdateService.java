@@ -33,7 +33,7 @@ public class LocationUpdateService extends Service {
         locationRequest.setInterval(2000);
         locationRequest.setFastestInterval(1000);
         locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
-        locationRequest.setSmallestDisplacement(5);
+        locationRequest.setSmallestDisplacement(3);
 
         locationCallback = new LocationCallback() {
             @Override

@@ -97,7 +97,7 @@ public class registration extends AppCompatActivity {
                     auth.createUserWithEmailAndPassword(emaill,Password).addOnCompleteListener(new OnCompleteListener<AuthResult>() {
                         @Override
                         public void onComplete(@NonNull Task<AuthResult> task) {
-                            progressDialog.dismiss(); // Dismiss the progressDialog here
+                            progressDialog.dismiss();
 
                             if (task.isSuccessful()) {
                                 String id = task.getResult().getUser().getUid();
@@ -108,7 +108,7 @@ public class registration extends AppCompatActivity {
                                         .addOnCompleteListener(new OnCompleteListener<Void>() {
                                             @Override
                                             public void onComplete(@NonNull Task<Void> emailTask) {
-                                                progressDialog.dismiss(); // Dismiss the progressDialog here
+                                                progressDialog.dismiss();
 
                                                 if (emailTask.isSuccessful()) {
                                                     Toast.makeText(registration.this, "Verification email sent.", Toast.LENGTH_SHORT).show();

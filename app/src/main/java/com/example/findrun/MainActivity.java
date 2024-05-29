@@ -150,7 +150,6 @@ public class MainActivity extends AppCompatActivity {
         String currentUserUid = auth.getCurrentUser().getUid();
         DatabaseReference chatsRef = database.getReference("chats").child(currentUserUid);
 
-        // Fetch both sent and received chats
         chatsRef.addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
@@ -168,7 +167,6 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    // Helper method to add a user to the list and update RecyclerView
     private void addUserToList(String userId) {
         DatabaseReference userRef = database.getReference("user").child(userId);
         userRef.addListenerForSingleValueEvent(new ValueEventListener() {
@@ -205,10 +203,10 @@ public class MainActivity extends AppCompatActivity {
         mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
 
         locationRequest = LocationRequest.create();
-        locationRequest.setInterval(2000); // 1 second interval for real-time updates
-        locationRequest.setFastestInterval(1000); // 0.5 second fastest interval
+        locationRequest.setInterval(2000);
+        locationRequest.setFastestInterval(1000);
         locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
-        locationRequest.setSmallestDisplacement(3); // 3 meters
+        locationRequest.setSmallestDisplacement(3);
 
         locationCallback = new LocationCallback() {
             @Override
@@ -226,7 +224,6 @@ public class MainActivity extends AppCompatActivity {
 
     private void saveUserLocation(Location location) {
         if (location != null && auth.getCurrentUser() != null && location.getLatitude() != 0 && location.getLongitude() != 0) {
-            // Filter out locations with low accuracy
             if (location.getAccuracy() > 20) {
                 Log.d(TAG, "Location accuracy too low: " + location.getAccuracy());
                 return;

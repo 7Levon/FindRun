@@ -68,7 +68,7 @@ public class chatwindo extends AppCompatActivity {
         sendBtn = findViewById(R.id.sendbtnn);
         textMsg = findViewById(R.id.textmsg);
         receiverNameView = findViewById(R.id.recivername);
-        userStatusView = findViewById(R.id.userstatus); // Initialize userStatusView
+        userStatusView = findViewById(R.id.userstatus);
         profile = findViewById(R.id.profileimgg);
         messageAdapter = findViewById(R.id.msgadpter);
         messagesArrayList = new ArrayList<>();
@@ -81,7 +81,7 @@ public class chatwindo extends AppCompatActivity {
 
         Picasso.get().load(receiverImg).into(profile);
         receiverNameView.setText(receiverName);
-        userStatusView.setText(receiverStatus); // Set the status
+        userStatusView.setText(receiverStatus);
 
         DatabaseReference reference = database.getReference().child("user").child(senderUID);
         reference.addValueEventListener(new ValueEventListener() {
@@ -93,7 +93,7 @@ public class chatwindo extends AppCompatActivity {
 
             @Override
             public void onCancelled(@NonNull DatabaseError error) {
-                // Handle error
+
             }
         });
 
@@ -112,7 +112,7 @@ public class chatwindo extends AppCompatActivity {
 
             @Override
             public void onCancelled(@NonNull DatabaseError error) {
-                // Handle error
+
             }
         });
 
@@ -161,7 +161,7 @@ public class chatwindo extends AppCompatActivity {
                 int screenHeight = rootLayout.getRootView().getHeight();
                 int keypadHeight = screenHeight - r.bottom;
 
-                if (keypadHeight < screenHeight * 0.15) { // Keyboard is hidden
+                if (keypadHeight < screenHeight * 0.15) {
                     messageAdapter.scrollToPosition(messagesArrayList.size() - 1);
                 }
             }

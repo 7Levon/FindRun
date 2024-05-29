@@ -54,7 +54,7 @@ public class msgModelclass {
         this.message = message;
         this.senderid = senderid;
         this.timestamp = timestamp;
-        this.isRead = false;  // Default to false
+        this.isRead = false;
     }
 
     // Getters and Setters

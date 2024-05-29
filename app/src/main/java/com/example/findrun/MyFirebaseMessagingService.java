@@ -16,23 +16,18 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
     @Override
     public void onMessageReceived(RemoteMessage remoteMessage) {
-        // Log incoming message to see its structure
         Log.d(TAG, "From: " + remoteMessage.getFrom());
 
-        // Handle data messages
         if (remoteMessage.getData().size() > 0) {
             String title = remoteMessage.getData().getOrDefault("title", "Notification");
             String message = remoteMessage.getData().getOrDefault("message", "You've got a new message!");
 
-            // Show notification
             notificationHelper.showNotification(title, message);
         }
     }
 
     @Override
     public void onNewToken(String token) {
-        // Update the new token for this device as needed
         Log.d(TAG, "New Token: " + token);
-        // Optionally, you can send this token to your server for future targeting
     }
 }
