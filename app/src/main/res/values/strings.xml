@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">AV Messenger</string>
+    <string name="levon_davtyan">Levon Davtyan</string>
+    <string name="findrun_chat">FindRun Chat</string>
+
+    <string name="google_maps_api_key">AIzaSyD8GTMm7KZm-eTwrkXPmZtmapTzq3l-Y-c</string>
+
+</resources>

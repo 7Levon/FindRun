@@ -1,0 +1,25 @@
+[debug] [2024-05-11T12:38:40.474Z] ----------------------------------------------------------------------
+[debug] [2024-05-11T12:38:40.499Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\Lenovo\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js init emulators
+[debug] [2024-05-11T12:38:40.500Z] CLI Version:   13.8.3
+[debug] [2024-05-11T12:38:40.501Z] Platform:      win32
+[debug] [2024-05-11T12:38:40.501Z] Node Version:  v20.13.1
+[debug] [2024-05-11T12:38:40.502Z] Time:          Sat May 11 2024 16:38:40 GMT+0400 (Հայաստանի ստանդարտ ժամանակ)
+[debug] [2024-05-11T12:38:40.502Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2024-05-11T12:38:40.613Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2024-05-11T12:38:40.613Z] > authorizing via signed-in user (levdavtyan2007@gmail.com)
+[info] 
+     ######## #### ########  ######## ########     ###     ######  ########
+     ##        ##  ##     ## ##       ##     ##  ##   ##  ##       ##
+     ######    ##  ########  ######   ########  #########  ######  ######
+     ##        ##  ##    ##  ##       ##     ## ##     ##       ## ##
+     ##       #### ##     ## ######## ########  ##     ##  ######  ########
+
+You're about to initialize a Firebase project in this directory:
+
+  C:\Users\Lenovo\AndroidStudioProjects\FindRun
+
+Before we get started, keep in mind:
+
+  * You are initializing within an existing Firebase project directory
+

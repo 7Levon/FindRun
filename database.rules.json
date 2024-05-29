@@ -1,0 +1,16 @@
+{
+  "rules": {
+    ".read": "auth != null",
+    ".write": "auth != null",
+    "user": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid && auth.token.email_verified === true",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+    "User Locations": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    }
+  }
+}

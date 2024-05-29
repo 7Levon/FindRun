@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "948107320300",
+    "project_id": "findrun-9a621",
+    "storage_bucket": "findrun-9a621.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:948107320300:android:887b1f3b936acb67ddbec9",
+        "android_client_info": {
+          "package_name": "com.example.findrun"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD8GTMm7KZm-eTwrkXPmZtmapTzq3l-Y-c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
