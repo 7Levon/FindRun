@@ -9,6 +9,7 @@ import androidx.core.content.ContextCompat;
 
 import android.Manifest;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -31,6 +32,7 @@ import android.widget.Toast;
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.target.CustomTarget;
 import com.bumptech.glide.request.transition.Transition;
+import com.example.findrun.TrackingState;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
@@ -52,9 +54,12 @@ import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 
 import org.jetbrains.annotations.Nullable;
 
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -74,16 +79,14 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
     private FusedLocationProviderClient mFusedLocationClient;
     private LocationRequest locationRequest;
     private LocationCallback locationCallback;
-    private Button start;
-    private ImageView stop;
+    private Button startButton;
+    private ImageView stopButton;
     private List<LatLng> userPath = new ArrayList<>();
     private Polyline userPolyline;
     private TextView timerTextView;
     private TextView distanceTextView;
     private Handler timerHandler;
-    private long startTime, timeInMilliseconds = 0L;
-    private boolean isTracking = false;
-    private float totalDistance = 0f;
+    private long timeInMilliseconds = 0L;
     private boolean isInitialZoomDone = false;
     private Handler statusHandler;
     private Runnable statusRunnable;
@@ -116,9 +119,6 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         initializeFirebase();
         setupLocationUpdates();
 
-        start.setOnClickListener(v -> startTracking());
-        stop.setOnClickListener(v -> stopTracking());
-
         statusHandler = new Handler();
         statusRunnable = new Runnable() {
             @Override
@@ -131,12 +131,15 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
     }
 
     private void initializeViews() {
-        start = findViewById(R.id.start);
-        stop = findViewById(R.id.stop);
+        startButton = findViewById(R.id.start);
+        stopButton = findViewById(R.id.stop);
         timerTextView = findViewById(R.id.timer);
         distanceTextView = findViewById(R.id.distanceTextView);
 
         timerHandler = new Handler();
+
+        startButton.setOnClickListener(v -> startTracking());
+        stopButton.setOnClickListener(v -> stopTracking());
 
         Log.d(TAG, "Views initialized");
     }
@@ -176,10 +179,10 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
 
     private void setupLocationUpdates() {
         locationRequest = LocationRequest.create();
-        locationRequest.setInterval(2000);
-        locationRequest.setFastestInterval(1000);
+        locationRequest.setInterval(1000);
+        locationRequest.setFastestInterval(500);
         locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
-        locationRequest.setSmallestDisplacement(5);
+        locationRequest.setSmallestDisplacement(1);
 
         locationCallback = new LocationCallback() {
             @Override
@@ -195,36 +198,15 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         Log.d(TAG, "Location updates set up");
     }
 
-    private void startTracking() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            userPath.clear();
-            totalDistance = 0f;
-            if (userPolyline != null) {
-                userPolyline.remove();
-            }
-            userPolyline = mMap.addPolyline(new PolylineOptions()
-                    .addAll(userPath)
-                    .width(10)
-                    .color(ContextCompat.getColor(this, R.color.dark_blue)));
-            mFusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, null);
 
-            start.setVisibility(View.GONE);
-            stop.setVisibility(View.VISIBLE);
-
-            startTime = SystemClock.uptimeMillis();
-            timerHandler.postDelayed(updateTimerThread, 0);
-            isTracking = true;
-
-            Log.d(TAG, "Tracking started");
-        } else {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, LOCATION_PERMISSION_REQUEST_CODE);
-        }
-    }
 
     private Runnable updateTimerThread = new Runnable() {
         public void run() {
-            if (isTracking) {
+            if (TrackingState.getInstance().isTracking()) {
+                long startTime = TrackingState.getInstance().getStartTime();
                 timeInMilliseconds = SystemClock.uptimeMillis() - startTime;
+                TrackingState.getInstance().setTimeInMilliseconds(timeInMilliseconds);
+
                 int secs = (int) (timeInMilliseconds / 1000);
                 int mins = secs / 60;
                 int hours = mins / 60;
@@ -237,24 +219,42 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         }
     };
 
+    private void startTracking() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            TrackingState.getInstance().setTracking(true);
+            TrackingState.getInstance().setStartTime(SystemClock.uptimeMillis());
+            timerHandler.postDelayed(updateTimerThread, 0);
+            mFusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, null);
+
+            startButton.setVisibility(View.GONE);
+            stopButton.setVisibility(View.VISIBLE);
+
+            Log.d(TAG, "Tracking started");
+        } else {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, LOCATION_PERMISSION_REQUEST_CODE);
+        }
+    }
+
     private void stopTracking() {
         mFusedLocationClient.removeLocationUpdates(locationCallback);
         if (userPolyline != null) {
             userPolyline.remove();
         }
-        userPath.clear();
-        totalDistance = 0f;
+        TrackingState.getInstance().getUserPath().clear();
+        TrackingState.getInstance().resetDistance();
+        TrackingState.getInstance().setTimeInMilliseconds(0L);
 
-        start.setVisibility(View.VISIBLE);
-        stop.setVisibility(View.GONE);
+        startButton.setVisibility(View.VISIBLE);
+        stopButton.setVisibility(View.GONE);
 
-        isTracking = false;
+        TrackingState.getInstance().setTracking(false);
         timerHandler.removeCallbacks(updateTimerThread);
         timerTextView.setText("00:00:00");
         distanceTextView.setText("0.0 m");
 
         Log.d(TAG, "Tracking stopped");
     }
+
 
     private void updateMyLocation(android.location.Location location) {
         if (mMap != null && location != null) {
@@ -265,41 +265,36 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
             LatLng myLatLng = new LatLng(location.getLatitude(), location.getLongitude());
             myLatLng = smoothLocation(myLatLng);
 
-            Marker myMarker = mMarkers.get(mAuth.getCurrentUser().getUid());
-            if (myMarker != null) {
-                LatLng finalMyLatLng = myLatLng;
-                runOnUiThread(() -> myMarker.setPosition(finalMyLatLng));
-            } else {
-                LatLng finalMyLatLng1 = myLatLng;
-                runOnUiThread(() -> {
-                    Marker marker = mMap.addMarker(new MarkerOptions().position(finalMyLatLng1).title("You are here") );
-                    mMarkers.put(mAuth.getCurrentUser().getUid(), marker);
-                    markerUserMap.put(marker, mAuth.getCurrentUser().getUid());
-                });
-            }
-
-            if (isTracking) {
-                if (userPath.size() > 0) {
-                    LatLng lastLatLng = userPath.get(userPath.size() - 1);
+            // Update user location without adding or updating the current user's marker
+            if (TrackingState.getInstance().isTracking()) {
+                List<LatLng> path = TrackingState.getInstance().getUserPath();
+                if (path.size() > 0) {
+                    LatLng lastLatLng = path.get(path.size() - 1);
                     float[] results = new float[1];
                     android.location.Location.distanceBetween(lastLatLng.latitude, lastLatLng.longitude, myLatLng.latitude, myLatLng.longitude, results);
-                    totalDistance += results[0];
+                    float distance = results[0];
+                    TrackingState.getInstance().addDistance(distance);
                 }
 
-                userPath.add(myLatLng);
+                path.add(myLatLng);
+                TrackingState.getInstance().setUserPath(path);
                 runOnUiThread(() -> {
                     if (userPolyline != null) {
-                        userPolyline.setPoints(userPath);
+                        userPolyline.setPoints(path);
+                    } else {
+                        userPolyline = mMap.addPolyline(new PolylineOptions()
+                                .addAll(path)
+                                .width(10)
+                                .color(ContextCompat.getColor(MapActivity.this, R.color.dark_blue)));
                     }
-
-                    distanceTextView.setText(String.format("%.2f m", totalDistance));
+                    updateDistanceUI();
                 });
             }
 
             if (!isInitialZoomDone) {
-                LatLng finalMyLatLng2 = myLatLng;
+                LatLng finalMyLatLng = myLatLng;
                 runOnUiThread(() -> {
-                    mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(finalMyLatLng2, 15));
+                    mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(finalMyLatLng, 15));
                     isInitialZoomDone = true;
                 });
             }
@@ -308,12 +303,34 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         }
     }
 
+
+
+    private void updateDistanceUI() {
+        runOnUiThread(() -> {
+            float totalDistance = TrackingState.getInstance().getTotalDistance();
+            distanceTextView.setText(String.format("%.2f m", totalDistance));
+        });
+    }
+    private void updatePolyline() {
+        if (mMap != null && TrackingState.getInstance().getUserPath() != null) {
+            if (userPolyline != null) {
+                userPolyline.remove();
+            }
+            userPolyline = mMap.addPolyline(new PolylineOptions()
+                    .addAll(TrackingState.getInstance().getUserPath())
+                    .width(10)
+                    .color(ContextCompat.getColor(this, R.color.dark_blue)));
+        }
+    }
+
+
     private LatLng smoothLocation(LatLng newLocation) {
-        if (userPath.size() < 2) {
+        List<LatLng> path = TrackingState.getInstance().getUserPath();
+        if (path.size() < 2) {
             return newLocation;
         }
 
-        LatLng lastLocation = userPath.get(userPath.size() - 1);
+        LatLng lastLocation = path.get(path.size() - 1);
         double distance = Math.sqrt(Math.pow(newLocation.latitude - lastLocation.latitude, 2) +
                 Math.pow(newLocation.longitude - lastLocation.longitude, 2));
 
@@ -342,6 +359,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         });
 
         Log.d(TAG, "Map is ready");
+        updatePolyline();
     }
 
     private void enableMyLocation() {
@@ -366,22 +384,6 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
             }
         }
     }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        isDestroyed = false;
-        mMapView.onResume();
-        statusHandler.post(statusRunnable);
-        updateUserStatus();
-
-        if (mMap == null) {
-            mMapView.getMapAsync(this);
-        }
-
-        Log.d(TAG, "Activity resumed");
-    }
-
     @Override
     protected void onStart() {
         super.onStart();
@@ -403,8 +405,61 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         mMapView.onPause();
         mFusedLocationClient.removeLocationUpdates(locationCallback);
         updateUserStatusInactive();
+
+        // Save state
+        SharedPreferences preferences = getSharedPreferences("FindRunPrefs", MODE_PRIVATE);
+        SharedPreferences.Editor editor = preferences.edit();
+        editor.putLong("timeInMilliseconds", TrackingState.getInstance().getTimeInMilliseconds());
+        editor.putFloat("totalDistance", TrackingState.getInstance().getTotalDistance());
+        editor.putString("userPath", new Gson().toJson(TrackingState.getInstance().getUserPath()));
+        editor.putBoolean("isTracking", TrackingState.getInstance().isTracking());
+        editor.apply();
+
         Log.d(TAG, "Activity paused");
     }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        isDestroyed = false;
+        mMapView.onResume();
+        statusHandler.post(statusRunnable);
+        updateUserStatus();
+
+        if (mMap == null) {
+            mMapView.getMapAsync(this);
+        } else {
+            updatePolyline();
+        }
+
+        SharedPreferences preferences = getSharedPreferences("FindRunPrefs", MODE_PRIVATE);
+        long savedTimeInMilliseconds = preferences.getLong("timeInMilliseconds", 0L);
+        float savedTotalDistance = preferences.getFloat("totalDistance", 0f);
+        String userPathJson = preferences.getString("userPath", "[]");
+        boolean isTracking = preferences.getBoolean("isTracking", false);
+        Type listType = new TypeToken<ArrayList<LatLng>>() {}.getType();
+        List<LatLng> savedUserPath = new Gson().fromJson(userPathJson, listType);
+
+        TrackingState.getInstance().setTimeInMilliseconds(savedTimeInMilliseconds);
+        TrackingState.getInstance().setTotalDistance(savedTotalDistance);
+        TrackingState.getInstance().setUserPath(savedUserPath);
+        TrackingState.getInstance().setTracking(isTracking);
+
+        if (isTracking) {
+            startButton.setVisibility(View.GONE);
+            stopButton.setVisibility(View.VISIBLE);
+            timerHandler.postDelayed(updateTimerThread, 0);
+        } else {
+            startButton.setVisibility(View.VISIBLE);
+            stopButton.setVisibility(View.GONE);
+        }
+
+        updateUI();
+
+        Log.d(TAG, "Activity resumed");
+    }
+
+
 
     @Override
     protected void onDestroy() {
@@ -428,7 +483,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 Users user = snapshot.getValue(Users.class);
-                if (user != null && !isDestroyed) {  // Check if activity is not destroyed
+                if (user != null && !isDestroyed) {
                     String currentUserUid = mAuth.getCurrentUser().getUid();
                     initiateChat(currentUserUid, userId);
 
@@ -452,6 +507,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
             @Override
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
                 long currentTime = System.currentTimeMillis();
+                String currentUserId = mAuth.getCurrentUser().getUid();
                 for (DataSnapshot snapshot : dataSnapshot.getChildren()) {
                     UserLocation location = snapshot.getValue(UserLocation.class);
                     String userId = snapshot.getKey();
@@ -460,11 +516,15 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
                         Long lastUpdated = snapshot.child("lastUpdated").getValue(Long.class);
                         if (isActive != null && isActive && (lastUpdated != null && (currentTime - lastUpdated) <= INACTIVE_THRESHOLD)) {
                             LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
-                            if (!mMarkers.containsKey(userId)) {
-                                addCustomMarker(userId, latLng);
-                            } else {
-                                Marker marker = mMarkers.get(userId);
-                                runOnUiThread(() -> marker.setPosition(latLng));
+
+                            // Skip adding the current user's marker
+                            if (!userId.equals(currentUserId)) {
+                                if (!mMarkers.containsKey(userId)) {
+                                    addCustomMarker(userId, latLng);
+                                } else {
+                                    Marker marker = mMarkers.get(userId);
+                                    runOnUiThread(() -> marker.setPosition(latLng));
+                                }
                             }
                         } else {
                             Marker marker = mMarkers.remove(userId);
@@ -484,6 +544,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         });
     }
 
+
     private void addCustomMarker(String userId, LatLng latLng) {
         DatabaseReference userRef = FirebaseDatabase.getInstance().getReference("user").child(userId);
         userRef.addListenerForSingleValueEvent(new ValueEventListener() {
@@ -497,7 +558,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
                             .into(new CustomTarget<Bitmap>() {
                                 @Override
                                 public void onResourceReady(@NonNull Bitmap resource, @Nullable Transition<? super Bitmap> transition) {
-                                    if (!isDestroyed) {  // Check if activity is not destroyed
+                                    if (!isDestroyed) {
                                         runOnUiThread(() -> {
                                             Marker marker = mMap.addMarker(new MarkerOptions()
                                                     .position(latLng)
@@ -524,7 +585,6 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
     }
 
     private Bitmap getMarkerBitmapFromView(Bitmap bitmap) {
-
         Bitmap circularBitmap = getCircularBitmap(bitmap);
 
         View customMarkerView = getLayoutInflater().inflate(R.layout.custom_marker, null);
@@ -558,10 +618,25 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         return output;
     }
 
-
     private void initiateChat(String currentUserId, String otherUserId) {
         DatabaseReference chatsRef = FirebaseDatabase.getInstance().getReference("chats");
         chatsRef.child(currentUserId).child(otherUserId).setValue(true);
         chatsRef.child(otherUserId).child(currentUserId).setValue(true);
+    }
+
+    private void updateUI() {
+        updatePolyline();
+        updateTimerUI();
+    }
+
+
+
+    private void updateTimerUI() {
+        long timeInMilliseconds = TrackingState.getInstance().getTimeInMilliseconds();
+        int secs = (int) (timeInMilliseconds / 1000);
+        int mins = secs / 60;
+        int hours = mins / 60;
+        secs = secs % 60;
+        timerTextView.setText(String.format("%02d:%02d:%02d", hours, mins, secs));
     }
 }

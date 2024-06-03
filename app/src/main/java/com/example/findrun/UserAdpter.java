@@ -11,6 +11,7 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.ValueEventListener;
@@ -44,9 +45,35 @@ public class UserAdpter extends RecyclerView.Adapter<UserAdpter.viewholder> {
     public void onBindViewHolder(@NonNull viewholder holder, @SuppressLint("RecyclerView") int position) {
         Users user = usersArrayList.get(position);
         holder.username.setText(user.getUserName());
-        holder.userstatus.setText(user.getStatus());
         Picasso.get().load(user.getProfilepic()).into(holder.userimg);
 
+        // Get the current user's ID
+        String currentUserId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+
+        // Construct the chat reference path
+        String chatRoomId = currentUserId + user.getUserId();
+        DatabaseReference chatReference = FirebaseDatabase.getInstance().getReference().child("chats").child(chatRoomId).child("messages");
+
+        // Add a ValueEventListener to update the unread indicator in real-time
+        chatReference.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                boolean hasUnreadMessages = false;
+                for (DataSnapshot messageSnapshot : snapshot.getChildren()) {
+                    msgModelclass message = messageSnapshot.getValue(msgModelclass.class);
+                    if (message != null && !message.isRead() && message.getSenderid().equals(user.getUserId())) {
+                        hasUnreadMessages = true;
+                        break;
+                    }
+                }
+                holder.unreadIndicator.setVisibility(hasUnreadMessages ? View.VISIBLE : View.GONE);
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                // Handle error if needed
+            }
+        });
 
         holder.itemView.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -57,7 +84,6 @@ public class UserAdpter extends RecyclerView.Adapter<UserAdpter.viewholder> {
                 intent.putExtra("uid", user.getUserId());
                 intent.putExtra("status", user.getStatus());
                 mainActivity.startActivity(intent);
-
             }
         });
     }
@@ -81,5 +107,5 @@ public class UserAdpter extends RecyclerView.Adapter<UserAdpter.viewholder> {
             unreadIndicator = itemView.findViewById(R.id.unreadIndicator);
         }
     }
-
 }
+

@@ -203,10 +203,10 @@ public class MainActivity extends AppCompatActivity {
         mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
 
         locationRequest = LocationRequest.create();
-        locationRequest.setInterval(2000);
-        locationRequest.setFastestInterval(1000);
+        locationRequest.setInterval(1000);
+        locationRequest.setFastestInterval(500);
         locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
-        locationRequest.setSmallestDisplacement(3);
+        locationRequest.setSmallestDisplacement(1);
 
         locationCallback = new LocationCallback() {
             @Override

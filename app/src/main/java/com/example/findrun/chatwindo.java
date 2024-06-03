@@ -97,61 +97,15 @@ public class chatwindo extends AppCompatActivity {
             }
         });
 
-        DatabaseReference chatReference = database.getReference().child("chats").child(senderRoom).child("messages");
-        chatReference.addValueEventListener(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                messagesArrayList.clear();
-                for (DataSnapshot dataSnapshot : snapshot.getChildren()) {
-                    msgModelclass message = dataSnapshot.getValue(msgModelclass.class);
-                    messagesArrayList.add(message);
-                }
-                messagesAdapter.notifyDataSetChanged();
-                messageAdapter.scrollToPosition(messagesArrayList.size() - 1);
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-
-            }
-        });
+        loadMessages();
 
         sendBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                String message = textMsg.getText().toString();
-                if (message.isEmpty()) {
-                    Toast.makeText(chatwindo.this, "Enter The Message First", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                textMsg.setText("");
-                Date date = new Date();
-                msgModelclass messageObj = new msgModelclass(message, senderUID, date.getTime());
-                messageObj.setRead(false);
-
-                database.getReference().child("chats")
-                        .child(senderRoom)
-                        .child("messages")
-                        .push().setValue(messageObj).addOnCompleteListener(new OnCompleteListener<Void>() {
-                            @Override
-                            public void onComplete(@NonNull Task<Void> task) {
-                                database.getReference().child("chats")
-                                        .child(receiverRoom)
-                                        .child("messages")
-                                        .push().setValue(messageObj).addOnCompleteListener(new OnCompleteListener<Void>() {
-                                            @Override
-                                            public void onComplete(@NonNull Task<Void> task) {
-                                                if (task.isSuccessful()) {
-                                                    messageAdapter.smoothScrollToPosition(messagesArrayList.size() - 1);
-                                                }
-                                            }
-                                        });
-                            }
-                        });
+                sendMessage();
             }
         });
 
-        messageAdapter.scrollToPosition(messagesArrayList.size() - 1);
         rootLayout = findViewById(R.id.root_layout);
         rootLayout.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
             @Override
@@ -166,5 +120,82 @@ public class chatwindo extends AppCompatActivity {
                 }
             }
         });
+
+        markMessagesAsRead();
+    }
+
+    private void loadMessages() {
+        DatabaseReference chatReference = database.getReference().child("chats").child(senderRoom).child("messages");
+        chatReference.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                messagesArrayList.clear();
+                for (DataSnapshot dataSnapshot : snapshot.getChildren()) {
+                    msgModelclass message = dataSnapshot.getValue(msgModelclass.class);
+                    if (message != null) {
+                        messagesArrayList.add(message);
+                    }
+                }
+                messagesAdapter.notifyDataSetChanged();
+                messageAdapter.scrollToPosition(messagesArrayList.size() - 1);
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                // Handle error if needed
+            }
+        });
+    }
+
+    private void markMessagesAsRead() {
+        DatabaseReference chatReference = database.getReference().child("chats").child(senderRoom).child("messages");
+        chatReference.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                for (DataSnapshot dataSnapshot : snapshot.getChildren()) {
+                    msgModelclass message = dataSnapshot.getValue(msgModelclass.class);
+                    if (message != null && !message.isRead() && message.getSenderid().equals(receiverUid)) {
+                        dataSnapshot.getRef().child("read").setValue(true);
+                    }
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                // Handle error if needed
+            }
+        });
+    }
+
+    private void sendMessage() {
+        String message = textMsg.getText().toString();
+        if (message.isEmpty()) {
+            Toast.makeText(chatwindo.this, "Enter The Message First", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        textMsg.setText("");
+        Date date = new Date();
+        msgModelclass messageObj = new msgModelclass(message, senderUID, date.getTime());
+        messageObj.setRead(false);
+
+        database.getReference().child("chats")
+                .child(senderRoom)
+                .child("messages")
+                .push().setValue(messageObj).addOnCompleteListener(new OnCompleteListener<Void>() {
+                    @Override
+                    public void onComplete(@NonNull Task<Void> task) {
+                        database.getReference().child("chats")
+                                .child(receiverRoom)
+                                .child("messages")
+                                .push().setValue(messageObj).addOnCompleteListener(new OnCompleteListener<Void>() {
+                                    @Override
+                                    public void onComplete(@NonNull Task<Void> task) {
+                                        if (task.isSuccessful()) {
+                                            messageAdapter.smoothScrollToPosition(messagesArrayList.size() - 1);
+                                        }
+                                    }
+                                });
+                    }
+                });
     }
 }
