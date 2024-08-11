@@ -7,7 +7,7 @@
     android:background="@drawable/settingback"
     tools:context=".setting">
 
-    <ImageView
+    <de.hdodenhof.circleimageview.CircleImageView
         android:id="@+id/settingprofile"
         android:layout_width="179dp"
         android:layout_height="149dp"
@@ -49,7 +49,7 @@
 
     <Button
         android:id="@+id/donebutt"
-        android:backgroundTint="@color/black"
+        android:backgroundTint="@color/cyan"
         android:layout_width="@dimen/_100sdp"
         android:layout_height="@dimen/_45sdp"
         android:text="Save"

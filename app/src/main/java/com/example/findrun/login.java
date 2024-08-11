@@ -20,6 +20,7 @@ import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.database.FirebaseDatabase;
 
 public class login extends AppCompatActivity {
     TextView logsignup;
@@ -81,6 +82,8 @@ public class login extends AppCompatActivity {
                                 FirebaseUser user = auth.getCurrentUser();
                                 if (user != null) {
                                     if (user.isEmailVerified()) {
+
+
                                         try {
                                             Intent intent = new Intent(login.this, MainActivity.class);
                                             startActivity(intent);
@@ -100,5 +103,7 @@ public class login extends AppCompatActivity {
                 }
             }
         });
+
     }
+
 }

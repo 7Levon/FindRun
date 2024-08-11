@@ -31,10 +31,12 @@
             android:layout_height="wrap_content"
             android:layout_margin="13dp"
             android:layout_weight="1"
-            android:backgroundTint="@color/black"
+            android:background="@drawable/background_input"
+
             android:gravity="center"
             android:text="No"
-            android:textColor="@color/white" />
+            android:textStyle="bold"
+            android:textColor="@color/cyan" />
 
         <Button
             android:id="@+id/yesbnt"
@@ -42,10 +44,12 @@
             android:layout_height="wrap_content"
             android:layout_margin="13dp"
             android:layout_weight="1"
-            android:backgroundTint="@color/black"
+            android:background="@drawable/background_input"
+
             android:gravity="center"
             android:text="Yes"
-            android:textColor="@color/white" />
+            android:textStyle="bold"
+            android:textColor="@color/cyan" />
 
     </LinearLayout>
 

@@ -1,6 +1,5 @@
 package com.example.findrun;
 
-import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
 import android.view.LayoutInflater;
@@ -10,23 +9,20 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
-
+import com.bumptech.glide.Glide;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
-import com.google.firebase.database.ValueEventListener;
-import com.squareup.picasso.Picasso;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import de.hdodenhof.circleimageview.CircleImageView;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
+import java.util.ArrayList;
+import de.hdodenhof.circleimageview.CircleImageView;
 
-public class UserAdpter extends RecyclerView.Adapter<UserAdpter.viewholder> {
-    Context mainActivity;
-    ArrayList<Users> usersArrayList;
-    DatabaseReference userRef;
+public class UserAdpter extends RecyclerView.Adapter<UserAdpter.ViewHolder> {
+    private Context mainActivity;
+    private ArrayList<Users> usersArrayList;
+    private DatabaseReference userRef;
 
     public UserAdpter(Context mainActivity, ArrayList<Users> usersArrayList) {
         this.mainActivity = mainActivity;
@@ -36,25 +32,26 @@ public class UserAdpter extends RecyclerView.Adapter<UserAdpter.viewholder> {
 
     @NonNull
     @Override
-    public viewholder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+    public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View view = LayoutInflater.from(mainActivity).inflate(R.layout.user_item, parent, false);
-        return new viewholder(view);
+        return new ViewHolder(view);
     }
 
     @Override
-    public void onBindViewHolder(@NonNull viewholder holder, @SuppressLint("RecyclerView") int position) {
+    public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         Users user = usersArrayList.get(position);
         holder.username.setText(user.getUserName());
-        Picasso.get().load(user.getProfilepic()).into(holder.userimg);
 
-        // Get the current user's ID
+        // Use Glide to load the user avatar
+        Glide.with(mainActivity)
+                .load(user.getProfilepic())
+                .placeholder(R.drawable.man) // default avatar in case of no image
+                .into(holder.userimg);
+
         String currentUserId = FirebaseAuth.getInstance().getCurrentUser().getUid();
-
-        // Construct the chat reference path
         String chatRoomId = currentUserId + user.getUserId();
         DatabaseReference chatReference = FirebaseDatabase.getInstance().getReference().child("chats").child(chatRoomId).child("messages");
 
-        // Add a ValueEventListener to update the unread indicator in real-time
         chatReference.addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
@@ -93,13 +90,13 @@ public class UserAdpter extends RecyclerView.Adapter<UserAdpter.viewholder> {
         return usersArrayList.size();
     }
 
-    public class viewholder extends RecyclerView.ViewHolder {
+    public static class ViewHolder extends RecyclerView.ViewHolder {
         CircleImageView userimg;
         TextView username;
         TextView userstatus;
         ImageView unreadIndicator;
 
-        public viewholder(@NonNull View itemView) {
+        public ViewHolder(@NonNull View itemView) {
             super(itemView);
             userimg = itemView.findViewById(R.id.userimg);
             username = itemView.findViewById(R.id.username);
@@ -108,4 +105,3 @@ public class UserAdpter extends RecyclerView.Adapter<UserAdpter.viewholder> {
         }
     }
 }
-

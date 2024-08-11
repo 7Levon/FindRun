@@ -194,7 +194,7 @@ import com.google.firebase.storage.StorageReference;
 import com.google.firebase.storage.UploadTask;
 import com.squareup.picasso.Picasso;
 
-public class setting extends AppCompatActivity {
+public class setting extends BaseActivity {
     ImageView setprofile;
     EditText setname, setstatus;
     Button donebut;
@@ -316,6 +316,7 @@ public class setting extends AppCompatActivity {
 
             }
         });
+        updateUserStatus();
     }
 
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {

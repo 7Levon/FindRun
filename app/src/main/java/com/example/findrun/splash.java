@@ -2,6 +2,7 @@ package com.example.findrun;
 
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 
 import android.annotation.SuppressLint;
 import android.app.ActivityOptions;
@@ -30,7 +31,7 @@ public class splash extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_splash);
         getSupportActionBar().hide();
-
+        getWindow().setNavigationBarColor(ContextCompat.getColor(this, R.color.cyan));
         name = findViewById(R.id.logonameimg);
         own1 = findViewById(R.id.ownone);
         own2 = findViewById(R.id.owntwo);
@@ -50,6 +51,6 @@ public class splash extends AppCompatActivity {
               startActivity(intent);
               finish();
           }
-      },4000);
+      },3000);
     }
 }

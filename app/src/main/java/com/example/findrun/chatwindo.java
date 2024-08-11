@@ -6,10 +6,14 @@ import androidx.cardview.widget.CardView;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import android.app.AlertDialog;
+import android.content.DialogInterface;
+import android.content.Intent;
 import android.graphics.Rect;
 import android.os.Bundle;
 import android.view.View;
 import android.view.ViewTreeObserver;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
@@ -27,10 +31,12 @@ import com.squareup.picasso.Picasso;
 
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 
 import de.hdodenhof.circleimageview.CircleImageView;
 
-public class chatwindo extends AppCompatActivity {
+public class chatwindo extends BaseActivity {
     String receiverImg, receiverUid, receiverName, receiverStatus, senderUID;
     CircleImageView profile;
     TextView receiverNameView, userStatusView;
@@ -82,6 +88,13 @@ public class chatwindo extends AppCompatActivity {
         Picasso.get().load(receiverImg).into(profile);
         receiverNameView.setText(receiverName);
         userStatusView.setText(receiverStatus);
+        Button drawRouteButton = findViewById(R.id.draw_route_button);
+        drawRouteButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                checkUserStatusAndSendPolylineRequest();
+            }
+        });
 
         DatabaseReference reference = database.getReference().child("user").child(senderUID);
         reference.addValueEventListener(new ValueEventListener() {
@@ -89,15 +102,16 @@ public class chatwindo extends AppCompatActivity {
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 senderImg = snapshot.child("profilepic").getValue(String.class);
                 receiverIImg = receiverImg;
+
+                // Load messages after avatars are set
+                loadMessages();
             }
 
             @Override
             public void onCancelled(@NonNull DatabaseError error) {
-
+                // Handle error if needed
             }
         });
-
-        loadMessages();
 
         sendBtn.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -122,6 +136,55 @@ public class chatwindo extends AppCompatActivity {
         });
 
         markMessagesAsRead();
+        updateUserStatus();
+    }
+
+    private void checkUserStatusAndSendPolylineRequest() {
+        DatabaseReference receiverStatusRef = database.getReference("User Locations").child(receiverUid).child("isActive");
+        receiverStatusRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                Boolean isActive = snapshot.getValue(Boolean.class);
+                if (isActive != null && isActive) {
+                    sendPolylineRequest();
+                } else {
+                    showUserNotOnlineDialog();
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Toast.makeText(chatwindo.this, "Failed to check user status", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void sendPolylineRequest() {
+        DatabaseReference requestRef = FirebaseDatabase.getInstance().getReference("polyline_requests").child(receiverUid);
+        Map<String, Object> requestMap = new HashMap<>();
+        requestMap.put("senderUid", senderUID);
+        requestMap.put("status", "pending");
+
+        requestRef.setValue(requestMap).addOnCompleteListener(task -> {
+            if (task.isSuccessful()) {
+                Toast.makeText(chatwindo.this, "Request sent", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(chatwindo.this, "Failed to send request", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void showUserNotOnlineDialog() {
+        new AlertDialog.Builder(this)
+                .setTitle("User Not Online")
+                .setMessage("The user you are trying to draw a route to is not currently online.")
+                .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.dismiss();
+                    }
+                })
+                .show();
     }
 
     private void loadMessages() {

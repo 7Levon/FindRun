@@ -5,7 +5,6 @@ import static com.example.findrun.Constants.PERMISSIONS_REQUEST_ENABLE_GPS;
 
 import android.Manifest;
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -43,7 +42,7 @@ import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends BaseActivity {
     private static final int PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION = 1;
     private static final String TAG = "MainActivity";
 
@@ -66,6 +65,7 @@ public class MainActivity extends AppCompatActivity {
         Log.d(TAG, "MainActivity has started");
         setContentView(R.layout.activity_main);
         getSupportActionBar().hide();
+        getWindow().setNavigationBarColor(ContextCompat.getColor(this, R.color.cyan));
 
         mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
         database = FirebaseDatabase.getInstance();
@@ -97,29 +97,7 @@ public class MainActivity extends AppCompatActivity {
         imglogout.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (!isFinishing()) {
-                    Dialog dialog = new Dialog(MainActivity.this, R.style.dialoge);
-                    dialog.setContentView(R.layout.dialog_layout);
-                    Button no, yes;
-                    yes = dialog.findViewById(R.id.yesbnt);
-                    no = dialog.findViewById(R.id.nobnt);
-                    yes.setOnClickListener(new View.OnClickListener() {
-                        @Override
-                        public void onClick(View v) {
-                            auth.signOut();
-                            Intent intent = new Intent(MainActivity.this, login.class);
-                            startActivity(intent);
-                            finish();
-                        }
-                    });
-                    no.setOnClickListener(new View.OnClickListener() {
-                        @Override
-                        public void onClick(View v) {
-                            dialog.dismiss();
-                        }
-                    });
-                    dialog.show();
-                }
+                showLogoutDialog();
             }
         });
 
@@ -142,8 +120,66 @@ public class MainActivity extends AppCompatActivity {
             Intent intent = new Intent(MainActivity.this, login.class);
             startActivity(intent);
             finish();
+        } else {
+            loadChats();
+            updateUserStatus();
         }
-        loadChats();
+    }
+
+    private void showLogoutDialog() {
+        if (!isFinishing()) {
+            Dialog dialog = new Dialog(MainActivity.this, R.style.dialoge);
+            dialog.setContentView(R.layout.dialog_layout);
+            Button no, yes;
+            yes = dialog.findViewById(R.id.yesbnt);
+            no = dialog.findViewById(R.id.nobnt);
+            yes.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    auth.signOut();
+                    navigateToLogin();
+                }
+            });
+            no.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    dialog.dismiss();
+                }
+            });
+            dialog.show();
+        }
+    }
+
+    private void navigateToLogin() {
+        Intent intent = new Intent(MainActivity.this, login.class);
+        startActivity(intent);
+        finish();
+    }
+
+    private void clearHandledRequests() {
+        String currentUserUid = auth.getCurrentUser().getUid();
+        DatabaseReference requestRef = FirebaseDatabase.getInstance().getReference("polyline_requests").child(currentUserUid);
+
+        requestRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                String status = snapshot.child("status").getValue(String.class);
+                if ("accepted".equals(status) || "rejected".equals(status)) {
+                    requestRef.removeValue().addOnCompleteListener(task -> {
+                        if (task.isSuccessful()) {
+                            Log.d(TAG, "Handled request removed");
+                        } else {
+                            Log.e(TAG, "Failed to remove handled request");
+                        }
+                    });
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Log.e(TAG, "Failed to read request status: " + error.getMessage());
+            }
+        });
     }
 
     private void loadChats() {
@@ -175,7 +211,6 @@ public class MainActivity extends AppCompatActivity {
                 Users user = userSnapshot.getValue(Users.class);
                 if (user != null) {
                     usersArrayList.add(user);
-
                     adapter.notifyDataSetChanged();
                     checkIfEmpty();
                 }
@@ -280,15 +315,24 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        if (mLocationPermissionGranted) {
-            startLocationUpdates();
+        if (auth.getCurrentUser() != null) {
+            clearHandledRequests();
+            if (mLocationPermissionGranted) {
+                startLocationUpdates();
+            }
+            listenForPolylineRequests();
         }
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        mFusedLocationClient.removeLocationUpdates(locationCallback);
+        if (mLocationPermissionGranted) {
+            mFusedLocationClient.removeLocationUpdates(locationCallback);
+        }
+        if (auth.getCurrentUser() != null) {
+            updateUserStatus();
+        }
     }
 
     private void getLocationPermission() {

@@ -6,9 +6,15 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.lifecycle.Observer;
+import androidx.lifecycle.ViewModelProvider;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import android.Manifest;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -19,6 +25,7 @@ import android.graphics.PorterDuffXfermode;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
+import android.location.Location;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.SystemClock;
@@ -32,7 +39,6 @@ import android.widget.Toast;
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.target.CustomTarget;
 import com.bumptech.glide.request.transition.Transition;
-import com.example.findrun.TrackingState;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
@@ -44,6 +50,7 @@ import com.google.android.gms.maps.MapView;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.Polyline;
@@ -65,7 +72,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class MapActivity extends AppCompatActivity implements OnMapReadyCallback {
+public class MapActivity extends BaseActivity implements OnMapReadyCallback {
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 101;
     private static final long INACTIVE_THRESHOLD = 5 * 60 * 1000;
     private static final String TAG = "MapActivity";
@@ -92,6 +99,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
     private Runnable statusRunnable;
     private static final long STATUS_UPDATE_INTERVAL = 5000;
     private boolean isDestroyed = false;
+    private LocationViewModel locationViewModel;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -102,7 +110,17 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         if (getSupportActionBar() != null) {
             getSupportActionBar().hide();
         }
-        mMapView = findViewById(R.id.user_list_map);
+
+        initializeViews();
+        initializeFirebase();
+        setupLocationUpdates();
+
+        String receiverUid = getIntent().getStringExtra("receiverUid");
+        String senderUid = getIntent().getStringExtra("senderUid");
+
+        if (receiverUid != null && senderUid != null) {
+            drawPolylineForBoth(senderUid, receiverUid);
+        }
 
         if (mMapView != null) {
             if (savedInstanceState != null) {
@@ -115,10 +133,6 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
             Log.e(TAG, "MapView is null");
         }
 
-        initializeViews();
-        initializeFirebase();
-        setupLocationUpdates();
-
         statusHandler = new Handler();
         statusRunnable = new Runnable() {
             @Override
@@ -128,19 +142,52 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
             }
         };
         statusHandler.post(statusRunnable);
+
+        // Start the LocationUpdateService
+        Intent serviceIntent = new Intent(this, LocationUpdateService.class);
+        ContextCompat.startForegroundService(this, serviceIntent);
+
+        // Register the BroadcastReceiver to receive location updates
+        LocalBroadcastManager.getInstance(this).registerReceiver(locationReceiver, new IntentFilter("LocationUpdate"));
+
+        // Register a listener for other users' location updates
+        setupUserMarkers();
+
+        // Set up the ViewModel and LiveData observation
+        locationViewModel = new ViewModelProvider(this).get(LocationViewModel.class);
+        locationViewModel.getLocationLiveData().observe(this, new Observer<Location>() {
+            @Override
+            public void onChanged(Location location) {
+                if (location != null) {
+                    updateMyLocation(location);
+                }
+            }
+        });
     }
 
+    private BroadcastReceiver locationReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            Location location = intent.getParcelableExtra("location");
+
+            // Update your map or UI with the new location data
+            if (location != null) {
+                updateMyLocation(location);
+            }
+        }
+    };
+
     private void initializeViews() {
+        mMapView = findViewById(R.id.user_list_map);
         startButton = findViewById(R.id.start);
         stopButton = findViewById(R.id.stop);
         timerTextView = findViewById(R.id.timer);
         distanceTextView = findViewById(R.id.distanceTextView);
 
-        timerHandler = new Handler();
-
         startButton.setOnClickListener(v -> startTracking());
         stopButton.setOnClickListener(v -> stopTracking());
 
+        timerHandler = new Handler();
         Log.d(TAG, "Views initialized");
     }
 
@@ -148,33 +195,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         mAuth = FirebaseAuth.getInstance();
         mUserLocationsRef = FirebaseDatabase.getInstance().getReference("User Locations");
         mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
-
         Log.d(TAG, "Firebase initialized");
-    }
-
-    private void updateUserStatus() {
-        String currentUserUid = mAuth.getCurrentUser().getUid();
-        if (currentUserUid != null) {
-            try {
-                mUserLocationsRef.child(currentUserUid).child("isActive").setValue(true);
-                mUserLocationsRef.child(currentUserUid).child("lastUpdated").setValue(System.currentTimeMillis());
-                Log.d(TAG, "User status updated to active");
-            } catch (Exception e) {
-                Log.e(TAG, "Error updating user status: " + e.getMessage());
-            }
-        }
-    }
-
-    private void updateUserStatusInactive() {
-        String currentUserUid = mAuth.getCurrentUser().getUid();
-        if (currentUserUid != null) {
-            try {
-                mUserLocationsRef.child(currentUserUid).child("isActive").setValue(false);
-                Log.d(TAG, "User status updated to inactive");
-            } catch (Exception e) {
-                Log.e(TAG, "Error updating user status: " + e.getMessage());
-            }
-        }
     }
 
     private void setupLocationUpdates() {
@@ -194,11 +215,91 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
                 }
             }
         };
-
         Log.d(TAG, "Location updates set up");
     }
 
+    private void drawPolylineForBoth(String senderUid, String receiverUid) {
+        DatabaseReference senderLocationRef = FirebaseDatabase.getInstance().getReference("User Locations").child(senderUid);
+        senderLocationRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                UserLocation senderLocation = snapshot.getValue(UserLocation.class);
+                if (senderLocation != null) {
+                    LatLng senderLatLng = new LatLng(senderLocation.getLatitude(), senderLocation.getLongitude());
+                    drawRoute(senderLatLng);
 
+                    DatabaseReference receiverLocationRef = FirebaseDatabase.getInstance().getReference("User Locations").child(receiverUid);
+                    receiverLocationRef.addListenerForSingleValueEvent(new ValueEventListener() {
+                        @Override
+                        public void onDataChange(@NonNull DataSnapshot snapshot) {
+                            UserLocation receiverLocation = snapshot.getValue(UserLocation.class);
+                            if (receiverLocation != null) {
+                                LatLng receiverLatLng = new LatLng(receiverLocation.getLatitude(), receiverLocation.getLongitude());
+                                drawRoute(receiverLatLng);
+
+                                DatabaseReference updateRef = FirebaseDatabase.getInstance().getReference("polyline_requests").child(senderUid);
+                                updateRef.child("status").setValue("accepted");
+                                updateRef.child("handled").setValue(true);
+                            }
+                        }
+
+                        @Override
+                        public void onCancelled(@NonNull DatabaseError error) {
+                            Log.e(TAG, "Failed to load receiver location: " + error.getMessage());
+                        }
+                    });
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Log.e(TAG, "Failed to load sender location: " + error.getMessage());
+            }
+        });
+    }
+
+    private void drawRoute(LatLng otherUserLatLng) {
+        if (mMap != null) {
+            LatLng currentUserLatLng = TrackingState.getInstance().getLastKnownLocation();
+            if (currentUserLatLng != null) {
+                PolylineOptions polylineOptions = new PolylineOptions()
+                        .add(currentUserLatLng)
+                        .add(otherUserLatLng)
+                        .width(10)
+                        .color(ContextCompat.getColor(this, R.color.dark_blue));
+
+                mMap.addPolyline(polylineOptions);
+                mMap.moveCamera(CameraUpdateFactory.newLatLngBounds(new LatLngBounds.Builder().include(currentUserLatLng).include(otherUserLatLng).build(), 100));
+            } else {
+                Log.e(TAG, "Current user's last known location is null");
+            }
+        }
+    }
+
+    public void updateUserStatus() {
+        String currentUserUid = mAuth.getCurrentUser().getUid();
+        if (currentUserUid != null) {
+            try {
+                mUserLocationsRef.child(currentUserUid).child("isActive").setValue(true);
+                mUserLocationsRef.child(currentUserUid).child("lastUpdated").setValue(System.currentTimeMillis());
+                Log.d(TAG, "User status updated to active");
+            } catch (Exception e) {
+                Log.e(TAG, "Error updating user status: " + e.getMessage());
+            }
+        }
+    }
+
+    public void updateUserStatusInactive() {
+        String currentUserUid = mAuth.getCurrentUser().getUid();
+        if (currentUserUid != null) {
+            try {
+                mUserLocationsRef.child(currentUserUid).child("isActive").setValue(false);
+                Log.d(TAG, "User status updated to inactive");
+            } catch (Exception e) {
+                Log.e(TAG, "Error updating user status: " + e.getMessage());
+            }
+        }
+    }
 
     private Runnable updateTimerThread = new Runnable() {
         public void run() {
@@ -255,8 +356,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         Log.d(TAG, "Tracking stopped");
     }
 
-
-    private void updateMyLocation(android.location.Location location) {
+    private void updateMyLocation(Location location) {
         if (mMap != null && location != null) {
             if (location.getAccuracy() > 20) {
                 return;
@@ -265,19 +365,20 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
             LatLng myLatLng = new LatLng(location.getLatitude(), location.getLongitude());
             myLatLng = smoothLocation(myLatLng);
 
-            // Update user location without adding or updating the current user's marker
             if (TrackingState.getInstance().isTracking()) {
                 List<LatLng> path = TrackingState.getInstance().getUserPath();
                 if (path.size() > 0) {
                     LatLng lastLatLng = path.get(path.size() - 1);
                     float[] results = new float[1];
-                    android.location.Location.distanceBetween(lastLatLng.latitude, lastLatLng.longitude, myLatLng.latitude, myLatLng.longitude, results);
+                    Location.distanceBetween(lastLatLng.latitude, lastLatLng.longitude, myLatLng.latitude, myLatLng.longitude, results);
                     float distance = results[0];
                     TrackingState.getInstance().addDistance(distance);
                 }
 
                 path.add(myLatLng);
                 TrackingState.getInstance().setUserPath(path);
+                TrackingState.getInstance().setLastKnownLocation(myLatLng); // Update last known location
+
                 runOnUiThread(() -> {
                     if (userPolyline != null) {
                         userPolyline.setPoints(path);
@@ -303,16 +404,15 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         }
     }
 
-
-
     private void updateDistanceUI() {
         runOnUiThread(() -> {
             float totalDistance = TrackingState.getInstance().getTotalDistance();
             distanceTextView.setText(String.format("%.2f m", totalDistance));
         });
     }
+
     private void updatePolyline() {
-        if (mMap != null && TrackingState.getInstance().getUserPath() != null) {
+        if (TrackingState.getInstance().isTracking() && mMap != null && TrackingState.getInstance().getUserPath() != null) {
             if (userPolyline != null) {
                 userPolyline.remove();
             }
@@ -323,6 +423,12 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         }
     }
 
+    private void clearPolyline() {
+        if (userPolyline != null) {
+            userPolyline.remove();
+            userPolyline = null;
+        }
+    }
 
     private LatLng smoothLocation(LatLng newLocation) {
         List<LatLng> path = TrackingState.getInstance().getUserPath();
@@ -384,6 +490,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
             }
         }
     }
+
     @Override
     protected void onStart() {
         super.onStart();
@@ -407,14 +514,10 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         updateUserStatusInactive();
 
         // Save state
-        SharedPreferences preferences = getSharedPreferences("FindRunPrefs", MODE_PRIVATE);
-        SharedPreferences.Editor editor = preferences.edit();
-        editor.putLong("timeInMilliseconds", TrackingState.getInstance().getTimeInMilliseconds());
-        editor.putFloat("totalDistance", TrackingState.getInstance().getTotalDistance());
-        editor.putString("userPath", new Gson().toJson(TrackingState.getInstance().getUserPath()));
-        editor.putBoolean("isTracking", TrackingState.getInstance().isTracking());
-        editor.apply();
+        TrackingState.getInstance().saveState(this);
 
+        statusHandler.removeCallbacks(statusRunnable);
+        timerHandler.removeCallbacks(updateTimerThread);
         Log.d(TAG, "Activity paused");
     }
 
@@ -432,26 +535,18 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
             updatePolyline();
         }
 
-        SharedPreferences preferences = getSharedPreferences("FindRunPrefs", MODE_PRIVATE);
-        long savedTimeInMilliseconds = preferences.getLong("timeInMilliseconds", 0L);
-        float savedTotalDistance = preferences.getFloat("totalDistance", 0f);
-        String userPathJson = preferences.getString("userPath", "[]");
-        boolean isTracking = preferences.getBoolean("isTracking", false);
-        Type listType = new TypeToken<ArrayList<LatLng>>() {}.getType();
-        List<LatLng> savedUserPath = new Gson().fromJson(userPathJson, listType);
+        // Restore state
+        TrackingState.getInstance().restoreState(this);
 
-        TrackingState.getInstance().setTimeInMilliseconds(savedTimeInMilliseconds);
-        TrackingState.getInstance().setTotalDistance(savedTotalDistance);
-        TrackingState.getInstance().setUserPath(savedUserPath);
-        TrackingState.getInstance().setTracking(isTracking);
-
-        if (isTracking) {
+        if (TrackingState.getInstance().isTracking()) {
             startButton.setVisibility(View.GONE);
             stopButton.setVisibility(View.VISIBLE);
             timerHandler.postDelayed(updateTimerThread, 0);
+            updatePolyline(); // Ensure polyline is drawn when resuming
         } else {
             startButton.setVisibility(View.VISIBLE);
             stopButton.setVisibility(View.GONE);
+            clearPolyline();
         }
 
         updateUI();
@@ -459,11 +554,10 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         Log.d(TAG, "Activity resumed");
     }
 
-
-
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(locationReceiver);
         isDestroyed = true;
         statusHandler.removeCallbacks(statusRunnable);
         updateUserStatusInactive();
@@ -523,7 +617,9 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
                                     addCustomMarker(userId, latLng);
                                 } else {
                                     Marker marker = mMarkers.get(userId);
-                                    runOnUiThread(() -> marker.setPosition(latLng));
+                                    if (marker != null) {
+                                        runOnUiThread(() -> marker.setPosition(latLng));
+                                    }
                                 }
                             }
                         } else {
@@ -543,7 +639,6 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
             }
         });
     }
-
 
     private void addCustomMarker(String userId, LatLng latLng) {
         DatabaseReference userRef = FirebaseDatabase.getInstance().getReference("user").child(userId);
@@ -628,8 +723,6 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         updatePolyline();
         updateTimerUI();
     }
-
-
 
     private void updateTimerUI() {
         long timeInMilliseconds = TrackingState.getInstance().getTimeInMilliseconds();
